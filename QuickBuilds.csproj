@@ -17,7 +17,7 @@
 
   <!-- Auto-deploy .bhm to Blish HUD modules directory after build -->
   <Target Name="DeployBhm" AfterTargets="BuildBlishHUDModule" Condition="Exists('$(BlishHudAddonsDir)')">
-    <Copy SourceFiles="$(BlishHUDModuleFilePath)" DestinationFolder="$(BlishHudAddonsDir)" />
+    <Copy SourceFiles="$(BlishHUDModuleFilePath)" DestinationFolder="$(BlishHudAddonsDir)" Retries="1" RetryDelayMilliseconds="100" ContinueOnError="true" />
     <Message Importance="High" Text="[QuickBuilds] Deployed $(BlishHUDModuleFileName).bhm to $(BlishHudAddonsDir)" />
   </Target>
 

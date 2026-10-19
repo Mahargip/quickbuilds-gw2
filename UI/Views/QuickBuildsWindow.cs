@@ -142,10 +142,11 @@ namespace QuickBuilds.UI.Views
             _categoryFilterDropdown.ValueChanged += (s, e) => RefreshBuildsList();
 
             // Editor Overlay Panel (initialized first so callbacks can reference it)
-            _editorPanel = new BuildEditorPanel(555, 500)
+            _editorPanel = new BuildEditorPanel(555, 545)
             {
-                Location = new Point(contentX, 10),
-                Parent = this
+                Location = new Point(contentX, 0),
+                Parent = this,
+                Visible = false
             };
             _editorPanel.BuildSaved += (s, savedBuild) =>
             {
@@ -157,7 +158,13 @@ namespace QuickBuilds.UI.Views
                 {
                     _storageService.Add(savedBuild);
                 }
+                HideEditor();
+                RefreshBuildsList();
                 SelectBuild(savedBuild);
+            };
+            _editorPanel.Cancelled += (s, e) =>
+            {
+                HideEditor();
             };
 
             _newBuildButton = new StandardButton
@@ -173,6 +180,7 @@ namespace QuickBuilds.UI.Views
                 string defaultProf = _selectedProfession.Equals("All", StringComparison.OrdinalIgnoreCase)
                     ? "Necromancer"
                     : _selectedProfession;
+                ShowEditor();
                 _editorPanel.OpenForNew(defaultProf);
             };
 
@@ -285,6 +293,7 @@ namespace QuickBuilds.UI.Views
 
         public void SelectProfession(string profession)
         {
+            HideEditor();
             _selectedProfession = profession;
 
             // Highlight selected button
@@ -343,7 +352,11 @@ namespace QuickBuilds.UI.Views
                 };
 
                 row.Selected += (s, b) => SelectBuild(b);
-                row.EditRequested += (s, b) => _editorPanel.OpenForEdit(b);
+                row.EditRequested += (s, b) =>
+                {
+                    ShowEditor();
+                    _editorPanel.OpenForEdit(b);
+                };
                 row.DeleteRequested += (s, b) =>
                 {
                     _storageService.Delete(b.Id);
@@ -393,6 +406,26 @@ namespace QuickBuilds.UI.Views
             _previewChatCode.Text = string.Empty;
             _previewNotes.Text = string.Empty;
             _previewCopyButton.Visible = false;
+        }
+
+        private void ShowEditor()
+        {
+            _searchBox.Visible = false;
+            _categoryFilterDropdown.Visible = false;
+            _newBuildButton.Visible = false;
+            _buildsFlow.Visible = false;
+            _previewPanel.Visible = false;
+            _editorPanel.Visible = true;
+        }
+
+        private void HideEditor()
+        {
+            _editorPanel.Visible = false;
+            _searchBox.Visible = true;
+            _categoryFilterDropdown.Visible = true;
+            _newBuildButton.Visible = true;
+            _buildsFlow.Visible = true;
+            _previewPanel.Visible = true;
         }
     }
 }

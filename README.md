@@ -27,17 +27,30 @@ In-game build storage is restricted to 24 account-wide slots and costs 500 gems 
 
 ---
 
+## Downloads & Releases
+
+Pre-compiled and signed `.bhm` module packages are published on the GitHub Releases page:
+
+👉 **[Download Latest QuickBuilds.bhm Release](https://github.com/Mahargip/quickbuilds-gw2/releases)**
+
+---
+
 ## How to Install
 
+### Method 1: Manual Installation (Recommended)
 1. Download the latest `QuickBuilds.bhm` file from the [Releases](https://github.com/Mahargip/quickbuilds-gw2/releases) page.
-2. Place the `.bhm` file into your Blish HUD modules folder:
+2. Open Windows Run (`Win + R`), paste the following path, and hit **Enter**:
    ```
    %USERPROFILE%\Documents\Guild Wars 2\addons\blishhud\modules\
    ```
-3. Launch **Guild Wars 2** and **Blish HUD**.
-4. Open the Blish HUD settings window (helmet icon) and navigate to **Manage Modules**.
-5. Enable **QuickBuilds**.
-6. Click the QuickBuilds icon on the top corner bar to open the manager.
+3. Drop the `QuickBuilds.bhm` file directly into this folder.
+4. Launch **Guild Wars 2** and **Blish HUD** (or restart Blish HUD if it is already open).
+5. Click the Blish HUD helmet icon (top-left) $\rightarrow$ **Manage Modules**.
+6. Find **QuickBuilds** in the list and click **Enable Module**.
+7. Click the new QuickBuilds icon in the top corner bar to open the manager!
+
+### Method 2: Development / From Source
+If you are compiling from source code using Visual Studio or `dotnet build`, the custom MSBuild target automatically packages and deploys the `.bhm` directly to your local Blish HUD directory upon every build.
 
 ---
 
