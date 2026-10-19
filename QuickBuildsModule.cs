@@ -28,6 +28,7 @@ namespace QuickBuilds
 
         // Services
         private BuildStorageService _storageService = null!;
+        private SpecializationDataService _specializationDataService = null!;
 
         // UI
         private CornerIcon? _cornerIcon;
@@ -70,10 +71,13 @@ namespace QuickBuilds
             {
                 Logger.Info("Initializing QuickBuilds module...");
 
-                // 1. Initialize Storage
+                // 1. Initialize Storage & Specialization Data
                 string storageDir = DirectoriesManager.GetFullDirectoryPath("quick-builds");
                 _storageService = new BuildStorageService();
                 _storageService.Initialize(storageDir);
+
+                _specializationDataService = new SpecializationDataService();
+                _specializationDataService.LoadData(ContentsManager, storageDir);
 
                 // 2. Load Textures
                 _windowBackground = AsyncTexture2D.FromAssetId(155997);
@@ -91,7 +95,7 @@ namespace QuickBuilds
                 await Task.CompletedTask;
 
                 // 3. Create Main Window
-                _mainWindow = new QuickBuildsWindow(_windowBackground, _storageService);
+                _mainWindow = new QuickBuildsWindow(_windowBackground, _storageService, _specializationDataService);
 
                 // 4. Create Corner Icon
                 _cornerIcon = new CornerIcon

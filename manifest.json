@@ -15,5 +15,5 @@
     }
   ],
   "directories": [ "quick-builds" ],
-  "enabled_without_gw2": false
+  "enabled_without_gw2": true
 }

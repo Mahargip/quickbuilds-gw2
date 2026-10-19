@@ -16,6 +16,7 @@ namespace QuickBuilds.UI.Views
         private static readonly Logger Logger = Logger.GetLogger<QuickBuildsWindow>();
 
         private readonly BuildStorageService _storageService;
+        private readonly SpecializationDataService _specializationDataService;
 
         // Sidebar - Profession Filter
         private readonly Panel _sidebarPanel;
@@ -35,14 +36,21 @@ namespace QuickBuilds.UI.Views
         private readonly Panel _previewPanel;
         private readonly Label _previewTitle;
         private readonly Label _previewCategory;
+        private readonly StandardButton _tabTreeButton;
+        private readonly StandardButton _tabNotesButton;
+        private readonly StandardButton _previewCopyButton;
+
+        // Preview sub-containers
+        private readonly BuildTraitTreePanel _traitTreePanel;
+        private readonly Panel _notesContainer;
         private readonly Label _previewChatCode;
         private readonly Label _previewNotes;
-        private readonly StandardButton _previewCopyButton;
 
         // Modal Editor Panel
         private readonly BuildEditorPanel _editorPanel;
 
         private BuildTemplateEntry? _selectedBuild;
+        private bool _isTreeTabActive = true;
 
         private static readonly string[] ProfessionList = new[]
         {
@@ -70,14 +78,18 @@ namespace QuickBuilds.UI.Views
             "Other"
         };
 
-        public QuickBuildsWindow(AsyncTexture2D background, BuildStorageService storageService)
-            : base(background, new Rectangle(25, 26, 760, 620), new Rectangle(35, 45, 715, 560))
+        public QuickBuildsWindow(
+            AsyncTexture2D background,
+            BuildStorageService storageService,
+            SpecializationDataService specializationDataService)
+            : base(background, new Rectangle(25, 26, 820, 680), new Rectangle(35, 45, 775, 620))
         {
             _storageService = storageService;
+            _specializationDataService = specializationDataService;
 
             Title = "QuickBuilds";
             Subtitle = "Lightweight Build Manager";
-            Id = "QuickBuilds_MainWindow_v1";
+            Id = "QuickBuilds_MainWindow_v2";
             SavesPosition = true;
             Parent = GameService.Graphics.SpriteScreen;
 
@@ -85,7 +97,7 @@ namespace QuickBuilds.UI.Views
             _sidebarPanel = new Panel
             {
                 Location = new Point(0, 0),
-                Size = new Point(140, 550),
+                Size = new Point(140, 615),
                 Parent = this
             };
 
@@ -118,6 +130,7 @@ namespace QuickBuilds.UI.Views
 
             // 2. Top Bar (Search, Category Filter, New Build)
             int contentX = 150;
+            int contentWidth = 615;
 
             _searchBox = new TextBox
             {
@@ -131,7 +144,7 @@ namespace QuickBuilds.UI.Views
             _categoryFilterDropdown = new Dropdown
             {
                 Location = new Point(contentX + 240, 5),
-                Size = new Point(150, 30),
+                Size = new Point(160, 30),
                 Parent = this
             };
             foreach (var cat in CategoryFilters)
@@ -142,7 +155,7 @@ namespace QuickBuilds.UI.Views
             _categoryFilterDropdown.ValueChanged += (s, e) => RefreshBuildsList();
 
             // Editor Overlay Panel (initialized first so callbacks can reference it)
-            _editorPanel = new BuildEditorPanel(555, 545)
+            _editorPanel = new BuildEditorPanel(contentWidth, 615)
             {
                 Location = new Point(contentX, 0),
                 Parent = this,
@@ -170,8 +183,8 @@ namespace QuickBuilds.UI.Views
             _newBuildButton = new StandardButton
             {
                 Text = "+ New Build",
-                Location = new Point(contentX + 400, 5),
-                Size = new Point(110, 30),
+                Location = new Point(contentX + 410, 5),
+                Size = new Point(120, 30),
                 BasicTooltipText = "Create a new build template",
                 Parent = this
             };
@@ -191,7 +204,7 @@ namespace QuickBuilds.UI.Views
                 ControlPadding = new Vector2(0, 4),
                 CanScroll = true,
                 Location = new Point(contentX, 42),
-                Size = new Point(555, 340),
+                Size = new Point(contentWidth, 235),
                 Parent = this
             };
 
@@ -206,11 +219,11 @@ namespace QuickBuilds.UI.Views
                 Parent = _buildsFlow
             };
 
-            // 4. Bottom - Preview / Inspector Panel
+            // 4. Bottom - Preview / Trait Tree Panel
             _previewPanel = new Panel
             {
-                Location = new Point(contentX, 390),
-                Size = new Point(555, 155),
+                Location = new Point(contentX, 282),
+                Size = new Point(contentWidth, 332),
                 BackgroundColor = new Color(18, 20, 26, 210),
                 Parent = this
             };
@@ -220,9 +233,9 @@ namespace QuickBuilds.UI.Views
                 Text = "Select a build to preview",
                 Font = GameService.Content.DefaultFont16,
                 TextColor = Color.Gold,
-                Location = new Point(12, 10),
-                Width = 380,
-                Height = 22,
+                Location = new Point(12, 6),
+                Width = 330,
+                Height = 20,
                 Parent = _previewPanel
             };
 
@@ -231,40 +244,38 @@ namespace QuickBuilds.UI.Views
                 Text = string.Empty,
                 Font = GameService.Content.DefaultFont12,
                 TextColor = Color.LightGray * 0.8f,
-                Location = new Point(12, 34),
-                Width = 380,
+                Location = new Point(12, 27),
+                Width = 330,
                 Height = 16,
                 Parent = _previewPanel
             };
 
-            _previewChatCode = new Label
+            // View toggle tabs
+            _tabTreeButton = new StandardButton
             {
-                Text = string.Empty,
-                Font = GameService.Content.DefaultFont12,
-                TextColor = Color.LightSkyBlue,
-                Location = new Point(12, 54),
-                Width = 380,
-                Height = 16,
+                Text = "Tree",
+                Location = new Point(355, 8),
+                Size = new Point(75, 26),
+                Visible = false,
                 Parent = _previewPanel
             };
+            _tabTreeButton.Click += (s, e) => SwitchTab(true);
 
-            _previewNotes = new Label
+            _tabNotesButton = new StandardButton
             {
-                Text = string.Empty,
-                Font = GameService.Content.DefaultFont12,
-                TextColor = Color.LightGray,
-                Location = new Point(12, 74),
-                Width = 380,
-                Height = 70,
-                WrapText = true,
+                Text = "Notes",
+                Location = new Point(435, 8),
+                Size = new Point(75, 26),
+                Visible = false,
                 Parent = _previewPanel
             };
+            _tabNotesButton.Click += (s, e) => SwitchTab(false);
 
             _previewCopyButton = new StandardButton
             {
-                Text = "Copy Code",
-                Location = new Point(415, 12),
-                Size = new Point(120, 32),
+                Text = "Copy",
+                Location = new Point(515, 8),
+                Size = new Point(88, 26),
                 Visible = false,
                 Parent = _previewPanel
             };
@@ -278,10 +289,50 @@ namespace QuickBuilds.UI.Views
                     await System.Threading.Tasks.Task.Delay(2000);
                     if (_previewCopyButton.Parent != null)
                     {
-                        _previewCopyButton.Text = "Copy Code";
+                        _previewCopyButton.Text = "Copy";
                         _previewCopyButton.Enabled = true;
                     }
                 }
+            };
+
+            // Trait Tree View Container
+            _traitTreePanel = new BuildTraitTreePanel(_specializationDataService, 605, 275)
+            {
+                Location = new Point(5, 48),
+                Parent = _previewPanel
+            };
+
+            // Notes View Container
+            _notesContainer = new Panel
+            {
+                Location = new Point(5, 48),
+                Size = new Point(605, 275),
+                BackgroundColor = new Color(14, 16, 20, 220),
+                Visible = false,
+                Parent = _previewPanel
+            };
+
+            _previewChatCode = new Label
+            {
+                Text = string.Empty,
+                Font = GameService.Content.DefaultFont12,
+                TextColor = Color.LightSkyBlue,
+                Location = new Point(15, 12),
+                Width = 575,
+                Height = 20,
+                Parent = _notesContainer
+            };
+
+            _previewNotes = new Label
+            {
+                Text = string.Empty,
+                Font = GameService.Content.DefaultFont12,
+                TextColor = Color.LightGray,
+                Location = new Point(15, 38),
+                Width = 575,
+                Height = 220,
+                WrapText = true,
+                Parent = _notesContainer
             };
 
             // Event Subscriptions
@@ -289,6 +340,15 @@ namespace QuickBuilds.UI.Views
 
             // Initial view
             SelectProfession("All");
+        }
+
+        private void SwitchTab(bool showTree)
+        {
+            _isTreeTabActive = showTree;
+            _traitTreePanel.Visible = showTree;
+            _notesContainer.Visible = !showTree;
+            _tabTreeButton.Enabled = !showTree;
+            _tabNotesButton.Enabled = showTree;
         }
 
         public void SelectProfession(string profession)
@@ -346,7 +406,7 @@ namespace QuickBuilds.UI.Views
 
             foreach (var build in filtered)
             {
-                var row = new BuildRowControl(build, 535)
+                var row = new BuildRowControl(build, 595)
                 {
                     Parent = _buildsFlow
                 };
@@ -394,7 +454,13 @@ namespace QuickBuilds.UI.Views
             _previewChatCode.Text = build.ChatCode;
             _previewNotes.Text = string.IsNullOrWhiteSpace(build.Notes) ? "No notes added for this build." : build.Notes;
 
+            _traitTreePanel.SetBuild(build);
+
             _previewCopyButton.Visible = true;
+            _tabTreeButton.Visible = true;
+            _tabNotesButton.Visible = true;
+
+            SwitchTab(_isTreeTabActive);
         }
 
         private void ClearPreview()
@@ -406,6 +472,9 @@ namespace QuickBuilds.UI.Views
             _previewChatCode.Text = string.Empty;
             _previewNotes.Text = string.Empty;
             _previewCopyButton.Visible = false;
+            _tabTreeButton.Visible = false;
+            _tabNotesButton.Visible = false;
+            _traitTreePanel.SetBuild(null);
         }
 
         private void ShowEditor()
