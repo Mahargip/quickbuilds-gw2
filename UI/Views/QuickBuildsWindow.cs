@@ -1,0 +1,398 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Blish_HUD;
+using Blish_HUD.Content;
+using Blish_HUD.Controls;
+using Microsoft.Xna.Framework;
+using QuickBuilds.Models;
+using QuickBuilds.Services;
+using QuickBuilds.UI.Controls;
+
+namespace QuickBuilds.UI.Views
+{
+    public class QuickBuildsWindow : StandardWindow
+    {
+        private static readonly Logger Logger = Logger.GetLogger<QuickBuildsWindow>();
+
+        private readonly BuildStorageService _storageService;
+
+        // Sidebar - Profession Filter
+        private readonly Panel _sidebarPanel;
+        private readonly Dictionary<string, StandardButton> _professionButtons = new Dictionary<string, StandardButton>();
+        private string _selectedProfession = "All";
+
+        // Top Filter Bar
+        private readonly TextBox _searchBox;
+        private readonly Dropdown _categoryFilterDropdown;
+        private readonly StandardButton _newBuildButton;
+
+        // Center - Builds Flow Panel
+        private readonly FlowPanel _buildsFlow;
+        private readonly Label _emptyStateLabel;
+
+        // Bottom - Detail / Preview Panel
+        private readonly Panel _previewPanel;
+        private readonly Label _previewTitle;
+        private readonly Label _previewCategory;
+        private readonly Label _previewChatCode;
+        private readonly Label _previewNotes;
+        private readonly StandardButton _previewCopyButton;
+
+        // Modal Editor Panel
+        private readonly BuildEditorPanel _editorPanel;
+
+        private BuildTemplateEntry? _selectedBuild;
+
+        private static readonly string[] ProfessionList = new[]
+        {
+            "All",
+            "Necromancer",
+            "Guardian",
+            "Warrior",
+            "Engineer",
+            "Ranger",
+            "Thief",
+            "Elementalist",
+            "Mesmer",
+            "Revenant"
+        };
+
+        private static readonly string[] CategoryFilters = new[]
+        {
+            "All",
+            "Open World",
+            "Raid",
+            "Strike",
+            "Fractal",
+            "WvW",
+            "PvP",
+            "Other"
+        };
+
+        public QuickBuildsWindow(AsyncTexture2D background, BuildStorageService storageService)
+            : base(background, new Rectangle(25, 26, 760, 620), new Rectangle(35, 45, 715, 560))
+        {
+            _storageService = storageService;
+
+            Title = "QuickBuilds";
+            Subtitle = "Lightweight Build Manager";
+            Id = "QuickBuilds_MainWindow_v1";
+            SavesPosition = true;
+            Parent = GameService.Graphics.SpriteScreen;
+
+            // 1. Left Sidebar (Professions)
+            _sidebarPanel = new Panel
+            {
+                Location = new Point(0, 0),
+                Size = new Point(140, 550),
+                Parent = this
+            };
+
+            var sidebarTitle = new Label
+            {
+                Text = "Professions",
+                Font = GameService.Content.DefaultFont14,
+                TextColor = Color.Gold,
+                Location = new Point(5, 5),
+                Width = 130,
+                Parent = _sidebarPanel
+            };
+
+            int btnY = 30;
+            foreach (var prof in ProfessionList)
+            {
+                var profBtn = new StandardButton
+                {
+                    Text = prof,
+                    Location = new Point(0, btnY),
+                    Size = new Point(135, 28),
+                    Parent = _sidebarPanel
+                };
+
+                string p = prof;
+                profBtn.Click += (s, e) => SelectProfession(p);
+                _professionButtons[prof] = profBtn;
+                btnY += 32;
+            }
+
+            // 2. Top Bar (Search, Category Filter, New Build)
+            int contentX = 150;
+
+            _searchBox = new TextBox
+            {
+                PlaceholderText = "Search builds...",
+                Location = new Point(contentX, 5),
+                Size = new Point(230, 30),
+                Parent = this
+            };
+            _searchBox.TextChanged += (s, e) => RefreshBuildsList();
+
+            _categoryFilterDropdown = new Dropdown
+            {
+                Location = new Point(contentX + 240, 5),
+                Size = new Point(150, 30),
+                Parent = this
+            };
+            foreach (var cat in CategoryFilters)
+            {
+                _categoryFilterDropdown.Items.Add(cat);
+            }
+            _categoryFilterDropdown.SelectedItem = "All";
+            _categoryFilterDropdown.ValueChanged += (s, e) => RefreshBuildsList();
+
+            // Editor Overlay Panel (initialized first so callbacks can reference it)
+            _editorPanel = new BuildEditorPanel(555, 500)
+            {
+                Location = new Point(contentX, 10),
+                Parent = this
+            };
+            _editorPanel.BuildSaved += (s, savedBuild) =>
+            {
+                if (_storageService.AllBuilds.Any(b => b.Id == savedBuild.Id))
+                {
+                    _storageService.Update(savedBuild);
+                }
+                else
+                {
+                    _storageService.Add(savedBuild);
+                }
+                SelectBuild(savedBuild);
+            };
+
+            _newBuildButton = new StandardButton
+            {
+                Text = "+ New Build",
+                Location = new Point(contentX + 400, 5),
+                Size = new Point(110, 30),
+                BasicTooltipText = "Create a new build template",
+                Parent = this
+            };
+            _newBuildButton.Click += (s, e) =>
+            {
+                string defaultProf = _selectedProfession.Equals("All", StringComparison.OrdinalIgnoreCase)
+                    ? "Necromancer"
+                    : _selectedProfession;
+                _editorPanel.OpenForNew(defaultProf);
+            };
+
+            // 3. Center - Builds Flow Panel
+            _buildsFlow = new FlowPanel
+            {
+                FlowDirection = ControlFlowDirection.SingleTopToBottom,
+                ControlPadding = new Vector2(0, 4),
+                CanScroll = true,
+                Location = new Point(contentX, 42),
+                Size = new Point(555, 340),
+                Parent = this
+            };
+
+            _emptyStateLabel = new Label
+            {
+                Text = "No builds found. Click '+ New Build' to add one!",
+                Font = GameService.Content.DefaultFont14,
+                TextColor = Color.LightGray * 0.7f,
+                Location = new Point(20, 30),
+                Width = 400,
+                Visible = false,
+                Parent = _buildsFlow
+            };
+
+            // 4. Bottom - Preview / Inspector Panel
+            _previewPanel = new Panel
+            {
+                Location = new Point(contentX, 390),
+                Size = new Point(555, 155),
+                BackgroundColor = new Color(18, 20, 26, 210),
+                Parent = this
+            };
+
+            _previewTitle = new Label
+            {
+                Text = "Select a build to preview",
+                Font = GameService.Content.DefaultFont16,
+                TextColor = Color.Gold,
+                Location = new Point(12, 10),
+                Width = 380,
+                Height = 22,
+                Parent = _previewPanel
+            };
+
+            _previewCategory = new Label
+            {
+                Text = string.Empty,
+                Font = GameService.Content.DefaultFont12,
+                TextColor = Color.LightGray * 0.8f,
+                Location = new Point(12, 34),
+                Width = 380,
+                Height = 16,
+                Parent = _previewPanel
+            };
+
+            _previewChatCode = new Label
+            {
+                Text = string.Empty,
+                Font = GameService.Content.DefaultFont12,
+                TextColor = Color.LightSkyBlue,
+                Location = new Point(12, 54),
+                Width = 380,
+                Height = 16,
+                Parent = _previewPanel
+            };
+
+            _previewNotes = new Label
+            {
+                Text = string.Empty,
+                Font = GameService.Content.DefaultFont12,
+                TextColor = Color.LightGray,
+                Location = new Point(12, 74),
+                Width = 380,
+                Height = 70,
+                WrapText = true,
+                Parent = _previewPanel
+            };
+
+            _previewCopyButton = new StandardButton
+            {
+                Text = "Copy Code",
+                Location = new Point(415, 12),
+                Size = new Point(120, 32),
+                Visible = false,
+                Parent = _previewPanel
+            };
+            _previewCopyButton.Click += async (s, e) =>
+            {
+                if (_selectedBuild != null && !string.IsNullOrWhiteSpace(_selectedBuild.ChatCode))
+                {
+                    ClipboardService.SetText(_selectedBuild.ChatCode);
+                    _previewCopyButton.Text = "Copied!";
+                    _previewCopyButton.Enabled = false;
+                    await System.Threading.Tasks.Task.Delay(2000);
+                    if (_previewCopyButton.Parent != null)
+                    {
+                        _previewCopyButton.Text = "Copy Code";
+                        _previewCopyButton.Enabled = true;
+                    }
+                }
+            };
+
+            // Event Subscriptions
+            _storageService.BuildsChanged += (s, e) => RefreshBuildsList();
+
+            // Initial view
+            SelectProfession("All");
+        }
+
+        public void SelectProfession(string profession)
+        {
+            _selectedProfession = profession;
+
+            // Highlight selected button
+            foreach (var kvp in _professionButtons)
+            {
+                bool isSelected = kvp.Key.Equals(profession, StringComparison.OrdinalIgnoreCase);
+                kvp.Value.Enabled = !isSelected;
+            }
+
+            RefreshBuildsList();
+        }
+
+        public void AutoSelectActiveProfession()
+        {
+            try
+            {
+                var player = GameService.Gw2Mumble.PlayerCharacter;
+                if (player != null && !string.IsNullOrEmpty(player.Profession.ToString()))
+                {
+                    string prof = player.Profession.ToString();
+                    if (_professionButtons.ContainsKey(prof))
+                    {
+                        SelectProfession(prof);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex, "Could not auto-select active profession.");
+            }
+        }
+
+        public void RefreshBuildsList()
+        {
+            _buildsFlow.ClearChildren();
+
+            string query = _searchBox.Text;
+            string category = _categoryFilterDropdown.SelectedItem ?? "All";
+
+            var filtered = _storageService.Filter(_selectedProfession, category, query);
+
+            if (filtered.Count == 0)
+            {
+                _emptyStateLabel.Visible = true;
+                _emptyStateLabel.Parent = _buildsFlow;
+                return;
+            }
+
+            _emptyStateLabel.Visible = false;
+
+            foreach (var build in filtered)
+            {
+                var row = new BuildRowControl(build, 535)
+                {
+                    Parent = _buildsFlow
+                };
+
+                row.Selected += (s, b) => SelectBuild(b);
+                row.EditRequested += (s, b) => _editorPanel.OpenForEdit(b);
+                row.DeleteRequested += (s, b) =>
+                {
+                    _storageService.Delete(b.Id);
+                    if (_selectedBuild?.Id == b.Id)
+                    {
+                        ClearPreview();
+                    }
+                };
+            }
+
+            // If selected build is still in the list, re-preview it
+            if (_selectedBuild != null && filtered.Any(b => b.Id == _selectedBuild.Id))
+            {
+                SelectBuild(_selectedBuild);
+            }
+            else if (filtered.Count > 0)
+            {
+                SelectBuild(filtered[0]);
+            }
+            else
+            {
+                ClearPreview();
+            }
+        }
+
+        private void SelectBuild(BuildTemplateEntry build)
+        {
+            _selectedBuild = build;
+
+            string specText = string.IsNullOrEmpty(build.EliteSpec) ? string.Empty : $" ({build.EliteSpec})";
+            _previewTitle.Text = $"{build.Title}{specText}";
+            _previewTitle.TextColor = build.GetProfessionColor();
+
+            _previewCategory.Text = $"Mode: {build.Category}  |  Profession: {build.Profession}";
+            _previewChatCode.Text = build.ChatCode;
+            _previewNotes.Text = string.IsNullOrWhiteSpace(build.Notes) ? "No notes added for this build." : build.Notes;
+
+            _previewCopyButton.Visible = true;
+        }
+
+        private void ClearPreview()
+        {
+            _selectedBuild = null;
+            _previewTitle.Text = "Select a build to preview";
+            _previewTitle.TextColor = Color.Gold;
+            _previewCategory.Text = string.Empty;
+            _previewChatCode.Text = string.Empty;
+            _previewNotes.Text = string.Empty;
+            _previewCopyButton.Visible = false;
+        }
+    }
+}

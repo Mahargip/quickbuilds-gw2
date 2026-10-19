@@ -1,0 +1,19 @@
+{
+  "name": "QuickBuilds",
+  "version": "0.1.0",
+  "namespace": "Mapam.QuickBuilds",
+  "package": "QuickBuilds.dll",
+  "manifest_version": 1,
+  "description": "Lightweight and fast build template manager for Guild Wars 2. Organize unlimited builds by profession, preview gear notes, and copy chat codes in one click.",
+  "dependencies": {
+    "bh.blishhud": ">=1.2.0"
+  },
+  "url": "https://github.com",
+  "contributors": [
+    {
+      "name": "Mapam"
+    }
+  ],
+  "directories": [ "quick-builds" ],
+  "enabled_without_gw2": false
+}

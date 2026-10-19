@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>QuickBuilds</AssemblyName>
+    <RootNamespace>QuickBuilds</RootNamespace>
+    <Nullable>enable</Nullable>
+    <BlishHudAddonsDir>$(USERPROFILE)\Documents\Guild Wars 2\addons\blishhud\modules\</BlishHudAddonsDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BlishHUD" Version="1.2.0" ExcludeAssets="runtime;contentFiles;analyzers" />
+    <PackageReference Include="System.ComponentModel.Composition" Version="6.0.0" />
+    <Reference Include="System.Windows.Forms" />
+  </ItemGroup>
+
+  <!-- Auto-deploy .bhm to Blish HUD modules directory after build -->
+  <Target Name="DeployBhm" AfterTargets="BuildBlishHUDModule" Condition="Exists('$(BlishHudAddonsDir)')">
+    <Copy SourceFiles="$(BlishHUDModuleFilePath)" DestinationFolder="$(BlishHudAddonsDir)" />
+    <Message Importance="High" Text="[QuickBuilds] Deployed $(BlishHUDModuleFileName).bhm to $(BlishHudAddonsDir)" />
+  </Target>
+
+</Project>
