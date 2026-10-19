@@ -31,13 +31,17 @@ namespace QuickBuilds.UI.Controls
 
         protected override void Paint(SpriteBatch spriteBatch, Rectangle bounds)
         {
-            if (_texture == null)
-                return;
-
-            Color drawColor = _isSelected ? Color.White : Color.White * 0.30f;
-
-            // Draw trait icon
-            spriteBatch.Draw(_texture, bounds, drawColor);
+            if (_texture != null && _texture.HasTexture)
+            {
+                Color drawColor = _isSelected ? Color.White : Color.White * 0.30f;
+                spriteBatch.Draw(_texture, bounds, drawColor);
+            }
+            else
+            {
+                // Fallback placeholder while icon downloads
+                Color placeholderColor = _isSelected ? _accentColor * 0.5f : Color.DarkSlateGray * 0.35f;
+                spriteBatch.Draw(ContentService.Textures.Pixel, bounds, placeholderColor);
+            }
 
             // If selected major trait, draw a clean highlight border around it
             if (_isSelected && !_isMinor)

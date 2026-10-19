@@ -28,7 +28,27 @@ namespace QuickBuilds.Services
             {
                 string json = string.Empty;
 
-                if (contentsManager != null)
+                // 1. Try embedded resource (guaranteed to be present in the DLL)
+                try
+                {
+                    using (var resStream = typeof(SpecializationDataService).Assembly.GetManifestResourceStream("QuickBuilds.trait_trees.json"))
+                    {
+                        if (resStream != null)
+                        {
+                            using (var reader = new StreamReader(resStream))
+                            {
+                                json = reader.ReadToEnd();
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn(ex, "Could not load trait_trees.json from EmbeddedResource, trying ContentsManager.");
+                }
+
+                // 2. Try ContentsManager
+                if (string.IsNullOrEmpty(json) && contentsManager != null)
                 {
                     try
                     {
@@ -49,6 +69,7 @@ namespace QuickBuilds.Services
                     }
                 }
 
+                // 3. Try local file fallbacks
                 if (string.IsNullOrEmpty(json))
                 {
                     string localPath = Path.Combine(moduleDir, "trait_trees.json");

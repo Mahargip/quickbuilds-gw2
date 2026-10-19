@@ -229,7 +229,7 @@ namespace QuickBuilds.UI.Controls
             base.PaintBeforeChildren(spriteBatch, bounds);
 
             // 1. Draw Background Art if available
-            if (_specBackgroundTexture != null)
+            if (_specBackgroundTexture != null && _specBackgroundTexture.HasTexture)
             {
                 spriteBatch.Draw(_specBackgroundTexture, bounds, Color.White * 0.75f);
             }

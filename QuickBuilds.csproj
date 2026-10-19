@@ -16,7 +16,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="trait_trees.json">
+    <EmbeddedResource Include="trait_trees.json" />
+    <None Update="ref\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
