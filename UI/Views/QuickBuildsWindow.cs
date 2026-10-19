@@ -450,7 +450,28 @@ namespace QuickBuilds.UI.Views
             _previewTitle.Text = $"{build.Title}{specText}";
             _previewTitle.TextColor = build.GetProfessionColor();
 
-            _previewCategory.Text = $"Mode: {build.Category}  |  Profession: {build.Profession}";
+            string specListText = string.Empty;
+            try
+            {
+                var decoded = BuildChatCodeDecoder.Decode(build.ChatCode);
+                if (decoded != null && decoded.IsValid)
+                {
+                    var names = new List<string>();
+                    foreach (var s in decoded.Specializations)
+                    {
+                        var spec = _specializationDataService.GetSpecialization(s.SpecializationId);
+                        if (spec != null)
+                            names.Add(spec.Name);
+                    }
+                    if (names.Count > 0)
+                    {
+                        specListText = $"  •  {string.Join(" / ", names)}";
+                    }
+                }
+            }
+            catch { }
+
+            _previewCategory.Text = $"Mode: {build.Category}  •  {build.Profession}{specListText}";
             _previewChatCode.Text = build.ChatCode;
             _previewNotes.Text = string.IsNullOrWhiteSpace(build.Notes) ? "No notes added for this build." : build.Notes;
 
